@@ -3,7 +3,9 @@ package main
 import (
   "code.google.com/p/go-html-transform/css/selector"
   "code.google.com/p/go-html-transform/h5"
+  "github.com/jmhodges/levigo"
   "io"
+  "io/ioutil"
   "log"
   "net/http"
 )
@@ -34,17 +36,36 @@ func get_links(reader io.Reader) (links []string, err error) {
       }
     }
   }
-
   return
 }
 
 func main() {
+  opts := levigo.NewOptions()
+  opts.SetCache(levigo.NewLRUCache(3 << 30))
+  opts.SetCreateIfMissing(true)
+  db, err := levigo.Open("./level.db", opts)
+  if err != nil {
+    log.Fatal(err.Error())
+  }
+
   resp, err := http.Get(root_url)
   if err != nil {
     log.Fatal(err.Error())
   }
 
-  links, err := get_links(resp.Body)
+  body_str, err := ioutil.ReadAll(resp.Body)
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  wo := levigo.NewWriteOptions()
+
+  err = db.Put(wo, []byte(root_url), body_str)
+  if err != nil {
+    log.Fatal(err.Error())
+  }
+
+  _, err = get_links(resp.Body)
   if err != nil {
     log.Fatal(err.Error())
   }
